@@ -1,0 +1,19 @@
+# Hugo build output (NUNCA commitar)
+/public/
+/resources/_gen/
+/assets/jsconfig.json
+hugo_stats.json
+
+# Hugo extended build lock
+.hugo_build.lock
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local backup
+*.bak
