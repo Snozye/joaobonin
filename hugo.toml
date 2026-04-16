@@ -20,6 +20,7 @@ baseURL = "https://joaobonin.com/"   # depois mudamos quando tiver domínio
     DateFormat = "January 2, 2006"
     defaultTheme = "dark"
     disableThemeToggle = false
+    copyright = "© 2026 [$ whoami](https://snozye.github.io/joaobonin/) · Built with [Hugo](https://gohugo.io/) + [PaperMod](https://github.com/adityatelange/hugo-PaperMod/)"
 
     ShowReadingTime = true
     ShowShareButtons = true
