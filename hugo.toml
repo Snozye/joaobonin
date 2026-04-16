@@ -1,11 +1,13 @@
-baseURL = "https://joaobonin.com/"   # depois mudamos quando tiver domínio
+baseURL = "https://snozye.github.io/joaobonin/"
   title = "João Vítor Moutinho Bonin"
   theme = "PaperMod"
-  paginate = 10
 
   enableRobotsTXT = true
   buildDrafts = false
   buildFuture = false
+
+  [pagination]
+    pagerSize = 10
 
   [minify]
     disableXML = true
