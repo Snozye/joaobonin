@@ -1,0 +1,76 @@
+baseURL = "https://joaobonin.com/"   # depois mudamos quando tiver domínio
+  title = "João Vítor Moutinho Bonin"
+  theme = "PaperMod"
+  paginate = 10
+
+  enableRobotsTXT = true
+  buildDrafts = false
+  buildFuture = false
+
+  [minify]
+    disableXML = true
+    minifyOutput = true
+
+  [params]
+    env = "production"
+    title = "João Vítor Moutinho Bonin"
+    description = "Product security engineer. Red team, AD attacks, cloud pentest. CRTA · OSCP track · 2x CTF Brazil champion."
+    keywords = ["red team", "penetration testing", "offensive security", "cybersecurity", "CRTA", "OSCP", "active directory", "CTF"]
+    author = "João Vítor Bonin"
+    DateFormat = "January 2, 2006"
+    defaultTheme = "dark"
+    disableThemeToggle = false
+
+    ShowReadingTime = true
+    ShowShareButtons = true
+    ShowPostNavLinks = true
+    ShowBreadCrumbs = true
+    ShowCodeCopyButtons = true
+    ShowToc = true
+
+  [params.homeInfoParams]
+    Title = "João Vítor Bonin"
+    Content = """
+Product Security Engineer at SAP Office of the CSO. 8 years at SAP across support, enterprise architecture, and security
+   governance. 
+Now pivoting to offensive security.\n\nM.Sc. Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs    
+  2026), OSCP in progress (OffSec), eJPTv2 (INE 2023). 2x National Champion at SAP CTF Brazil (2018, 2024).\n\nWriting about red team
+   operations, Active Directory attacks, cloud pentest, and C2 infrastructure. Learning out loud.
+
+  """
+
+  [[params.socialIcons]]
+    name = "github"
+    url = "https://github.com/Snozye"
+
+  [[params.socialIcons]]
+    name = "linkedin"
+    url = "https://linkedin.com/in/joão-bonin"
+
+  [[params.socialIcons]]
+    name = "email"
+    url = "mailto:bonin.jv@gmail.com"
+
+  [[menu.main]]
+    identifier = "posts"
+    name = "Posts"
+    url = "/posts/"
+    weight = 10
+
+  [[menu.main]]
+    identifier = "tags"
+    name = "Tags"
+    url = "/tags/"
+    weight = 20
+
+  [[menu.main]]
+    identifier = "about"
+    name = "About"
+    url = "/about/"
+    weight = 30
+
+  [markup.highlight]
+    style = "github-dark"
+    lineNos = true
+    codeFences = true
+    guessSyntax = true
