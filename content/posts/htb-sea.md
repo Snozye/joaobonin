@@ -8,7 +8,7 @@ ShowToc = true
 TocOpen = false
 
 [cover]
-image = '/images/htb-sea/cover.png'
+image = 'images/htb-sea/cover.png'
 +++
 
 ## Why this post exists
