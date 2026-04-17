@@ -1,4 +1,4 @@
-baseURL = "https://joaobonin.com/"
+baseURL = "https://snozye.github.io/joaobonin/"
   title = "João Vítor Moutinho Bonin"
   theme = "PaperMod"
 
@@ -22,7 +22,7 @@ baseURL = "https://joaobonin.com/"
     DateFormat = "January 2, 2006"
     defaultTheme = "dark"
     disableThemeToggle = false
-    copyright = "© 2026 [$ whoami](https://joaobonin.com/) · Built with [Hugo](https://gohugo.io/) + [PaperMod](https://github.com/adityatelange/hugo-PaperMod/)"
+    copyright = "© 2026 [$ whoami](https://snozye.github.io/joaobonin/) · Built with [Hugo](https://gohugo.io/) + [PaperMod](https://github.com/adityatelange/hugo-PaperMod/)"
 
     ShowReadingTime = true
     ShowShareButtons = false

