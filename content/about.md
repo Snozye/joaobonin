@@ -22,4 +22,3 @@ Eight years at SAP. From BTP platform support to Product Security Engineer in th
 ### Contact
 - Email: bonin.jv@gmail.com
 - LinkedIn: [linkedin.com/in/joão-bonin](https://linkedin.com/in/joão-bonin)
-- GitHub: [github.com/Snozye](https://github.com/Snozye)
