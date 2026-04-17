@@ -1,4 +1,4 @@
-baseURL = "https://snozye.github.io/joaobonin/"
+baseURL = "https://joaobonin.com/"
   title = "João Vítor Moutinho Bonin"
   theme = "PaperMod"
 
@@ -22,10 +22,10 @@ baseURL = "https://snozye.github.io/joaobonin/"
     DateFormat = "January 2, 2006"
     defaultTheme = "dark"
     disableThemeToggle = false
-    copyright = "© 2026 [$ whoami](https://snozye.github.io/joaobonin/) · Built with [Hugo](https://gohugo.io/) + [PaperMod](https://github.com/adityatelange/hugo-PaperMod/)"
+    copyright = "© 2026 [$ whoami](https://joaobonin.com/) · Built with [Hugo](https://gohugo.io/) + [PaperMod](https://github.com/adityatelange/hugo-PaperMod/)"
 
     ShowReadingTime = true
-    ShowShareButtons = true
+    ShowShareButtons = false
     ShowPostNavLinks = true
     ShowBreadCrumbs = true
     ShowCodeCopyButtons = true
@@ -39,7 +39,7 @@ baseURL = "https://snozye.github.io/joaobonin/"
     Content = """
 Product Security Engineer at SAP Office of the CSO. 8 years at SAP across support, enterprise architecture, and security
    governance.
-Now pivoting to offensive security.\n\nM.Sc. Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
+Now pivoting to offensive security.\n\nPost-grad Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
   2026), OSCP in progress (OffSec), eJPTv2 (INE 2023). 2x National Champion at SAP CTF Brazil (2018, 2024).\n\nWriting about red team
    operations, Active Directory attacks, cloud pentest, and C2 infrastructure. Learning out loud.
 

@@ -17,3 +17,7 @@ hugo_stats.json
 
 # Local backup
 *.bak
+
+# Raw materials for posts (screenshots, notes, drafts)
+# Copio para static/images/ o que quero publicar
+/inputs_posts/

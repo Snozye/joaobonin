@@ -16,8 +16,8 @@ Eight years at SAP. From BTP platform support to Product Security Engineer in th
 - CRTA (CyberWarfare Labs, 2026)
 - OSCP in progress (OffSec, PEN-200)
 - eJPTv2 (INE Security, 2023)
-- M.Sc. Offensive Cybersecurity – Red Team Operations (FIAP, 2025)
-- 2x National Champion — SAP CTF Brazil (2018, 2024)
+- Post-grad Offensive Cybersecurity - Red Team Operations (FIAP, 2025)
+- 2x National Champion - SAP CTF Brazil (2018, 2024)
 
 ### Contact
 - Email: bonin.jv@gmail.com
