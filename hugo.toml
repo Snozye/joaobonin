@@ -31,6 +31,9 @@ baseURL = "https://joaobonin.com/"
     ShowCodeCopyButtons = true
     ShowToc = true
 
+  [params.cover]
+    hiddenInList = false
+
   [params.label]
     text = "$ whoami"
 
@@ -39,7 +42,7 @@ baseURL = "https://joaobonin.com/"
     Content = """
 Product Security Engineer at SAP Office of the CSO. 8 years at SAP across support, enterprise architecture, and security
    governance.
-Now pivoting to offensive security.\n\nPost-grad Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
+Currently focused on product security assessments and vulnerability management, while building offensive security skills toward OSCP.\n\nPost-grad Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
   2026), OSCP in progress (OffSec), eJPTv2 (INE 2023). 2x National Champion at SAP CTF Brazil (2018, 2024).\n\nWriting about red team
    operations, Active Directory attacks, cloud pentest, and C2 infrastructure. Learning out loud.
 
