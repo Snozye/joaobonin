@@ -62,7 +62,7 @@ Currently focused on product security assessments and vulnerability management, 
 
   [[menu.main]]
     identifier = "posts"
-    name = "Posts"
+    name = "Write-ups"
     url = "/posts/"
     weight = 10
 
