@@ -1,5 +1,5 @@
 +++
-title = 'About'
+title = '$ whoami'
 layout = 'page'
 disableShare = true
 ShowBreadCrumbs = false

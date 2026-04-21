@@ -35,7 +35,7 @@ baseURL = "https://joaobonin.com/"
     hiddenInList = false
 
   [params.label]
-    text = "$ whoami"
+    text = "$ cd ~"
 
   [params.homeInfoParams]
     Title = "João Vítor Bonin"
