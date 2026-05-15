@@ -26,7 +26,7 @@ Version numbers in page footers exist for a reason. Searchor 2.4.0 handed over t
 
 - Nmap reveals a web app on port 80 - the page footer discloses "Powered by Flask and Searchor 2.4.0"
 - Searchor 2.4.0 is vulnerable to arbitrary command injection; a public exploit delivers a reverse shell as `svc`
-- Privilege escalation via DirtyFrag: compile and run the PoC to get root
+- Privilege escalation via DirtyFrag (universal Linux LPE): compile and run the PoC to get root
 
 ---
 
@@ -92,9 +92,13 @@ Shell lands as `svc`. Grab the user flag:
 
 ## Privilege Escalation
 
-### DirtyFrag - Linux Kernel LPE
+### DirtyFrag - Universal Linux LPE
 
-The machine runs an Ubuntu 22.04 kernel vulnerable to DirtyFrag, a local privilege escalation exploit targeting a memory corruption bug in the Linux kernel's network fragment reassembly path. The vulnerability allows an unprivileged user to corrupt kernel memory structures and gain code execution at the kernel level, resulting in a root shell. It works by triggering a use-after-free condition during IP fragment handling, allowing controlled writes to kernel memory to overwrite credentials.
+DirtyFrag is a newly discovered local privilege escalation exploit that stands out for one reason: it's been dubbed **universal**. Unlike most kernel exploits that require a specific kernel version, distro configuration, or enabled module, DirtyFrag works across a broad range of unpatched Linux kernels without any special preconditions - no `CONFIG_USER_NS`, no specific filesystem, no particular hardware.
+
+The vulnerability targets a memory corruption bug in the Linux kernel's IP fragment reassembly path. When the kernel reassembles fragmented IP packets, a flaw in how it manages fragment queue memory allows an unprivileged user to trigger a use-after-free condition. By carefully timing and shaping the heap, an attacker can corrupt kernel memory structures - specifically credential objects - and overwrite the UID/GID of their own process to zero, escalating to root without ever touching userland SUID binaries or sudo.
+
+What makes it particularly dangerous in real environments is the low barrier: it runs as a normal user, requires no network access, produces no obvious log noise, and compiles from a single C file.
 
 Clone the exploit:
 
@@ -121,7 +125,7 @@ id
 
 - **Page footers and "Powered by" strings are free version disclosures.** Always read the full page source - technology stack and version info often appear in footers, comments, or HTTP response headers.
 - **`eval()` without sanitization is an injection vector.** Searchor's bug is a Python `eval()` call on user input; any language that dynamically evaluates user-controlled strings is a target.
-- **Kernel exploits are fast privesc when patching is delayed.** A CVE on an unpatched kernel requires zero misconfigurations to exploit - compile, run, root.
+- **DirtyFrag is "universal" for a reason.** No special kernel config, no required modules, no specific distro - it works on a wide range of unpatched kernels. Keep it in your toolkit; if the kernel is behind on patches, this is often the fastest path to root with minimal noise.
 
 ## References
 
