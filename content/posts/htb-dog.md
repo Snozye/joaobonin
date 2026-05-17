@@ -38,7 +38,7 @@ Sometimes nmap does half the work for you. `.git` on port 80 is all the hint you
 
 ![Nmap results](/images/htb-dog/nmap.png)
 
-Ports 22 (SSH) and 80 (HTTP, Apache 2.4.41 Ubuntu). Two things worth flagging immediately: the `http-title` is "Home | Dog", and the `http-git` NSE script reports a Git repository at `/.git/` with a remote pointing to `https://gitea.dog.htb/BackDropDevs/dog_development`. The robots.txt entries are all Backdrop CMS paths. Framework and source exposure confirmed in one scan.
+Ports 22 (SSH) and 80 (HTTP, Apache 2.4.41 Ubuntu). Two things worth flagging immediately: the `http-title` is "Home | Dog", and the `http-git` NSE script flags a Git repository at `/.git/`. The robots.txt entries are all Backdrop CMS paths. Framework and source exposure confirmed in one scan.
 
 ---
 
