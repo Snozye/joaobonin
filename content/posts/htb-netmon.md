@@ -1,6 +1,6 @@
 +++
 date = '2026-05-19T00:00:00-03:00'
-draft = false
+draft = true
 title = 'HTB: Netmon - OSCP Prep Write-up'
 tags = ['htb', 'oscp', 'lain-kusanagi', 'write-up', 'windows', 'ftp', 'prtg', 'default-creds', 'rce', 'cve-2018-9276']
 description = 'Write-up for the HackTheBox machine Netmon - extracting a stale config backup via anonymous FTP, deducing a year-incremented password, and exploiting PRTG to get SYSTEM.'
@@ -55,15 +55,7 @@ ftp 10.129.230.176
 
 ![ftp anonymous login successful, Remote system type is Windows_NT](/images/htb-netmon/ftp-anonymous.png)
 
-Anonymous login works. The FTP root maps directly to `C:\`.
-
-```bash
-ftp> dir
-```
-
-![ftp dir from root showing standard Windows directories](/images/htb-netmon/ftp-root-dir.png)
-
-Navigating to the PRTG data directory:
+Anonymous login works. The FTP root maps directly to `C:\`. Navigating to the PRTG data directory:
 
 ```bash
 ftp> dir ProgramData/Paessler/"PRTG Network Monitor"
@@ -112,10 +104,6 @@ searchsploit PRTG
 **CVE-2018-9276** - authenticated RCE via the notification system. The exploit creates a new user in the local Administrators group. Version 18.1.37 is also affected.
 
 ### Running the exploit
-
-```bash
-./46527.sh -u http://10.129.230.176 -c '_gat=GA1...' -p 'prtgadmin' -d
-```
 
 ![exploit running, showing authenticated PRTG RCE banner, CVE-2018-9276, creates user pentest:P3nT3st!](/images/htb-netmon/exploit-run.png)
 
