@@ -1,6 +1,6 @@
 +++
 date = '2026-05-19T00:00:00-03:00'
-draft = true
+draft = false
 title = 'HTB: Netmon - OSCP Prep Write-up'
 tags = ['htb', 'oscp', 'lain-kusanagi', 'write-up', 'windows', 'ftp', 'prtg', 'default-creds', 'rce', 'cve-2018-9276']
 description = 'Write-up for the HackTheBox machine Netmon - extracting a stale config backup via anonymous FTP, deducing a year-incremented password, and exploiting PRTG to get SYSTEM.'
