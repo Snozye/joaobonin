@@ -10,7 +10,7 @@ ShowBreadCrumbs = false
 Product security engineer based in São Leopoldo, Brazil.
 
 ### Background
-Eight years at SAP. From BTP platform support to Product Security Engineer in the Office of the CSO. Currently focused on product security assessments and vulnerability management, while building offensive security skills toward OSCP.
+Eight years at SAP. From BTP platform support to Product Security Engineer in the Office of the CSO. Currently focused on product security assessments and vulnerability management, applying offensive techniques in HackTheBox and OSCP prep, with CRTA and FIAP Red Team postgrad.
 
 ### Offensive security
 - CRTA (CyberWarfare Labs, 2026)
