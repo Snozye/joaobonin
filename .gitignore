@@ -21,3 +21,11 @@ hugo_stats.json
 # Raw materials for posts (screenshots, notes, drafts)
 # Copio para static/images/ o que quero publicar
 /inputs_posts/
+
+# Local reference spreadsheets and binary data files
+*.numbers
+*.xlsx
+*.xls
+
+# Local write-up drafts (Obsidian workspace)
+/writeUps/
