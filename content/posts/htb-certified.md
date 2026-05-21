@@ -1,7 +1,7 @@
 ---
 title: "HTB Certified - Active Directory Certificate Services and ESC9"
 date: 2026-05-21
-draft: true
+draft: false
 tags:
   - htb
   - windows
