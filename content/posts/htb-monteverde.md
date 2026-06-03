@@ -52,15 +52,11 @@ This is clearly a Domain Controller - Kerberos on 88, LDAP on 389/636, Global Ca
 
 ## Enumeration
 
-### RPC User Enumeration
+### User Enumeration
 
-With a DC, the first thing to try is RPC with a null session. A lot of older AD environments still allow anonymous enumeration of users and groups, and sure enough:
+With a DC, the first thing to try is anonymous/null session enumeration. A lot of older AD environments still allow it, and sure enough:
 
-```bash
-rpcclient -U '' -N 10.129.228.111 -c 'enumdomusers'
-```
-
-{{< figure src="/images/htb-monteverde/enum-users.png" alt="rpcclient output listing domain users including SABatchJobs mhope AAD_987d7f and others" >}}
+{{< figure src="/images/htb-monteverde/enum-users.png" alt="nxc output listing domain users including SABatchJobs mhope AAD_987d7f and others" >}}
 
 We got a clean user list: `SABatchJobs`, `mhope`, `AAD_987d7f`, `dgalanos`, `roleary`, `smorgan`, plus the usual built-ins. The `AAD_987d7f` account stands out immediately - that naming convention is the Azure AD Connect sync account, which is auto-generated during installation. File that away for later.
 
