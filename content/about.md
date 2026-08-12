@@ -10,11 +10,11 @@ ShowBreadCrumbs = false
 Product security engineer based in São Leopoldo, Brazil.
 
 ### Background
-Eight years at SAP. From BTP platform support to Product Security Engineer in the Office of the CSO. Currently focused on product security assessments and vulnerability management, applying offensive techniques in HackTheBox and OSCP prep, with CRTA and FIAP Red Team postgrad.
+Eight years at SAP. From BTP platform support to Product Security Engineer in the Office of the CSO. Currently focused on product security assessments and vulnerability management, applying offensive techniques sharpened through the OSCP, HackTheBox, CRTA, and a FIAP Red Team postgrad.
 
 ### Offensive security
+- OSCP - OffSec Certified Professional (OffSec, PEN-200, 2026)
 - CRTA (CyberWarfare Labs, 2026)
-- OSCP in progress (OffSec, PEN-200)
 - eJPTv2 (INE Security, 2023)
 - Post-grad Offensive Cybersecurity - Red Team Operations (FIAP, 2025)
 - 2x National Champion - SAP CTF Brazil (2018, 2024)

@@ -16,7 +16,7 @@ baseURL = "https://joaobonin.com/"
   [params]
     env = "production"
     title = "João Vítor Moutinho Bonin"
-    description = "Product security engineer. Red team, AD attacks, cloud pentest. CRTA · OSCP track · 2x CTF Brazil champion."
+    description = "Product security engineer. Red team, AD attacks, cloud pentest. OSCP · CRTA · 2x CTF Brazil champion."
     keywords = ["red team", "penetration testing", "offensive security", "cybersecurity", "CRTA", "OSCP", "active directory", "CTF"]
     author = "João Vítor Bonin"
     DateFormat = "January 2, 2006"
@@ -42,8 +42,8 @@ baseURL = "https://joaobonin.com/"
     Content = """
 Product Security Engineer at SAP Office of the CSO. 8 years at SAP across support, enterprise architecture, and security
    governance.
-Currently focused on product security assessments and vulnerability management, while building offensive security skills toward OSCP.\n\nPost-grad Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
-  2026), OSCP in progress (OffSec), eJPTv2 (INE 2023). 2x National Champion at SAP CTF Brazil (2018, 2024).\n\nWriting about red team
+Currently focused on product security assessments and vulnerability management, backed by hands-on offensive security work.\n\nOSCP (OffSec 2026), Post-grad Red Team Operations (FIAP 2025), CRTA (CyberWarfare Labs
+  2026), eJPTv2 (INE 2023). 2x National Champion at SAP CTF Brazil (2018, 2024).\n\nWriting about red team
    operations, Active Directory attacks, cloud pentest, and C2 infrastructure.
 
   """
